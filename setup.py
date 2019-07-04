@@ -17,7 +17,7 @@ VERSION = None  # get this from __version__.py
 
 
 # What packages are required for this module to be executed?
-REQUIRED = ["click", "regex", "pandoc-attributes"]
+REQUIRED = ["dash", "black", "click", "regex", "pandoc-attributes"]
 
 # What packages are optional?
 EXTRAS = {
