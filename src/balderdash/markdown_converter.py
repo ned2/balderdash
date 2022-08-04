@@ -32,8 +32,8 @@ from pathlib import Path
 from textwrap import dedent
 
 from pandocattributes import PandocAttributes
-import dash_core_components as dcc
 
+# import dash_core_components as dcc
 
 
 class MarkdownConverter:
@@ -83,13 +83,13 @@ class MarkdownConverter:
         markdown_classes=None,
         dash_layout_classes=None,
         app_path=".",
-        indent="    ",            
+        indent="    ",
     ):
         """
-            code_regex - Custom regex for defining code blocks
-            precode    - string, lines of code to put at the start of the
-                         document, e.g.
-                         '%matplotlib inline\nimport numpy as np'
+        code_regex - Custom regex for defining code blocks
+        precode    - string, lines of code to put at the start of the
+                     document, e.g.
+                     '%matplotlib inline\nimport numpy as np'
         """
         self.precode = precode
         self.indent = indent
@@ -129,28 +129,28 @@ class MarkdownConverter:
         return content.strip()
 
     @staticmethod
-    def make_markdown_component(content, id=None, classes=None):
-        all_classes = self.markdown_classes + classes if classes else []
-        className = f"{' '.join(all_classes)}" if all_classes else None
+    def make_markdown_component(content, component_id=None, classes=None):
+        kwargs = {}
+        if content:
+            kwargs["children"] = f'"""\n{content}"""'
+        if component_id:
+            kwargs["id"] = component_id
+        if classes:
+            all_classes = self.dash_layout_classes + classes if classes else []
+            kwargs["className"] = f"{' '.join(all_classes)}" if all_classes else None
+        kwargs_str = ", ".join(f"{name}={value}" for name, value in kwargs.items())
+        return f"dcc.Markdown({kwargs_str})"
 
-        return dedent(f"""\
-        dcc.Markdown(
-            id={id},
-            className={className},
-            children=\"""{content}\"""
-        )""")
-    
     @staticmethod
-    def make_dash_component(path, id=None, classes=None):
-        all_classes = self.dash_layout_classes + classes if classes else []
-        className = f"{' '.join(all_classes)}" if all_classes else None
-
-        return dedent(f"""\
-        html.Div(
-            id={id},
-            className={className},
-            children=load_dash_app("{path}", app=app, precode=APP_PRECODE)
-        )""")
+    def make_dash_component(path, component_id=None, classes=None):
+        kwargs = {"children": f"load_dash_app('{path}', app=app, precode=APP_PRECODE)"}
+        if component_id:
+            kwargs["id"] = component_id
+        if classes:
+            all_classes = self.dash_layout_classes + classes if classes else []
+            kwargs["className"] = f"{' '.join(all_classes)}" if all_classes else None
+        kwargs_str = ", ".join(f"{name}={value}" for name, value in kwargs.items())
+        return f"html.Div({kwargs_str})"
 
     def blocks_to_components(self, blocks):
         """Convert blocks into Dash components"""
@@ -167,8 +167,10 @@ class MarkdownConverter:
                 if "precode" in attrs.classes:
                     self.precode = f"{self.precode}\n\n{attrs.classes['precode']}"
                 if "app-precode" in attrs.classes:
-                    self.app_precode = f"{self.app_precode}\n\n{attrs.classes['app-precode']}"
-                    
+                    self.app_precode = (
+                        f"{self.app_precode}\n\n{attrs.classes['app-precode']}"
+                    )
+
                 if "dash" not in attrs.classes:
                     # Currently ignore code blocks without a `dash` class
                     continue
@@ -179,11 +181,13 @@ class MarkdownConverter:
                     # eg app.foo:layout
                     path = self.app_path / attrs["app"]
                 else:
-                    # TODO: support copying inline apps into new dir 
+                    # TODO: support copying inline apps into new dir
                     continue
                 component_id = attrs.id if attrs.id != "" else None
                 classes = [c for c in attrs.classes if c not in ("dash", "app")]
-                yield self.make_dash_component(path, id=component_id, classes=classes)
+                yield self.make_dash_component(
+                    path, component_id=component_id, classes=classes
+                )
 
     def parse_blocks(self, text):
         """Extract the code and non-code blocks from given markdown text.
@@ -224,8 +228,11 @@ class MarkdownConverter:
         all_blocks[1::2] = code_blocks
 
         # remove possible empty Markdown cells
-        all_blocks = [b for b in all_blocks
-                      if not (b["type"] == self.markdown and not b["content"])]
+        all_blocks = [
+            b
+            for b in all_blocks
+            if not (b["type"] == self.markdown and not b["content"])
+        ]
         return all_blocks
 
     def to_dash(self, string, blacken=True, **kwargs):
@@ -234,9 +241,7 @@ class MarkdownConverter:
         layout = f",\n{self.indent}".join(c for c in components)
 
         dash_app = f"""\
-import dash_html_components as html
-import dash_core_components as dcc        
-from dash import Dash 
+from dash import Dash, dcc, html
 from balderdash import load_dash_app
 
 {self.precode}
@@ -264,4 +269,4 @@ if __name__ == "__main__":
         return self.to_dash(string, **kwargs)
 
     def convert(self, fp, **kwargs):
-        return self.to_dash(fp.read(), **kwargs)        
+        return self.to_dash(fp.read(), **kwargs)
