@@ -33,8 +33,6 @@ from textwrap import dedent
 
 from pandocattributes import PandocAttributes
 
-# import dash_core_components as dcc
-
 
 class MarkdownConverter:
     """Import markdown to IPython Notebook.
@@ -78,8 +76,6 @@ class MarkdownConverter:
     def __init__(
         self,
         code_regex=None,
-        precode="",
-        app_precode="",
         markdown_classes=None,
         dash_layout_classes=None,
         app_path=".",
@@ -91,9 +87,7 @@ class MarkdownConverter:
                      document, e.g.
                      '%matplotlib inline\nimport numpy as np'
         """
-        self.precode = precode
         self.indent = indent
-        self.app_precode = app_precode
         self.app_path = Path(app_path)
 
         if code_regex is not None:
@@ -143,7 +137,7 @@ class MarkdownConverter:
 
     @staticmethod
     def make_dash_component(path, component_id=None, classes=None):
-        kwargs = {"children": f"load_dash_app('{path}', app=app"}
+        kwargs = {"children": f"load_dash_app('{path}')"}
         if component_id:
             kwargs["id"] = component_id
         if classes:
@@ -232,19 +226,22 @@ class MarkdownConverter:
         components = self.blocks_to_components(blocks)
         layout = f",\n{self.indent}".join(c for c in components)
 
-        dash_app = f"""\
-from dash import Dash, dcc, html
+        dash_app = f"""
+from dash import dcc, html, register_page
+
 from balderdash import load_dash_app
 
-app = Dash(__name__)
-        
-app.layout = html.Div(
+register_page(__name__)
+
+layout = html.Div(
     [
         {layout}
     ]
 )
 """
-        return format_str(dash_app, mode=FileMode())
+        if blacken:
+            dash_app = format_str(dash_app, mode=FileMode()) 
+        return dash_app
 
     def converts(self, string, **kwargs):
         """Read string s to Dash file format."""

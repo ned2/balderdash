@@ -1,3 +1,4 @@
+import os
 import regex
 from pathlib import Path
 from functools import partial
@@ -41,17 +42,21 @@ def component_to_str(component):
 def preprocess_dash_app(content):
     # strip `app = Dash()``
     content = regex.sub("app?\s=?\sDash(\((?>[^)(]+|(?1))*+\))", "", content)
+    # strip `app = Dash()``
+    content = regex.sub("app\\.layout", "layout", content)
     # replace `@callback` with `@bdash_callback`
-    content = regex.sub("@callback", "@prefixed_callback", content)
+    content = regex.sub("@callback|@app\\.callback", "@prefixed_callback", content)
     return content
 
 
-def load_dash_app(path, app, encoding="utf8"):
+def load_dash_app(path, encoding="utf8"):
+    #breakpoint()
+    path = Path(os.getenv("BDASH_APP_PATH", '.')) / Path(path)
     with open(path, encoding=encoding) as f:
         content = f.read()
-    prefix = f"{Path(path).stem}_"
+    prefix = f"{path.stem}_"
     content = preprocess_dash_app(content)
-    scope = {"app": app, "prefixed_callback": partial(bdash_callback, prefix)}
+    scope = {"prefixed_callback": partial(bdash_callback, prefix)}
     exec(content, scope)
 
     not_configured = ImproperlyConfigured(
@@ -62,12 +67,9 @@ def load_dash_app(path, app, encoding="utf8"):
     )
     
     try:
-        layout = scope["app"].layout
+        layout = scope["layout"]
     except KeyError as error:
-        try:
-            layout = scope["layout"].layout
-        except KeyError as error:
-            raise not_configured
+        raise not_configured
         
     if callable(layout):
         layout = layout()
@@ -81,7 +83,6 @@ def load_dash_app(path, app, encoding="utf8"):
 
 
 def bdash_callback(prefix, *args, **kwargs):
-    print("bdash_callback")
     for component in args:
         component.component_id = f"{prefix}{component.component_id}"
     def wrapper(func):
