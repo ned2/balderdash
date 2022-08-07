@@ -143,7 +143,7 @@ class MarkdownConverter:
 
     @staticmethod
     def make_dash_component(path, component_id=None, classes=None):
-        kwargs = {"children": f"load_dash_app('{path}', app=app, precode=APP_PRECODE)"}
+        kwargs = {"children": f"load_dash_app('{path}', app=app"}
         if component_id:
             kwargs["id"] = component_id
         if classes:
@@ -163,14 +163,6 @@ class MarkdownConverter:
                 # attrs.classes  --> list of classed
                 # attrs.kvs      --> OrderedDict of key, val pairs
                 attrs = PandocAttributes(block["attributes"], "markdown")
-
-                if "precode" in attrs.classes:
-                    self.precode = f"{self.precode}\n\n{attrs.classes['precode']}"
-                if "app-precode" in attrs.classes:
-                    self.app_precode = (
-                        f"{self.app_precode}\n\n{attrs.classes['app-precode']}"
-                    )
-
                 if "dash" not in attrs.classes:
                     # Currently ignore code blocks without a `dash` class
                     continue
@@ -244,23 +236,13 @@ class MarkdownConverter:
 from dash import Dash, dcc, html
 from balderdash import load_dash_app
 
-{self.precode}
-
-# will be run before all sub apps
-APP_PRECODE = \"""{self.app_precode}\"""
-            
 app = Dash(__name__)
-app.config.suppress_callback_exceptions = True
         
 app.layout = html.Div(
     [
         {layout}
     ]
 )
-
-if __name__ == "__main__":
-    app.run_server(debug=True)
-
 """
         return format_str(dash_app, mode=FileMode())
 
