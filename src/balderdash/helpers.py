@@ -1,4 +1,8 @@
 import regex
+from pathlib import Path
+from functools import partial
+
+from dash import callback
 from dash.development.base_component import Component
 
 from .exceptions import ImproperlyConfigured
@@ -34,17 +38,20 @@ def component_to_str(component):
     return f"{component._type}({props_string})"
 
 
-def preprocess_dash_app(content, precode):
+def preprocess_dash_app(content):
     # strip `app = Dash()``
     content = regex.sub("app?\s=?\sDash(\((?>[^)(]+|(?1))*+\))", "", content)
-    return f"{precode}\n\n{content}"
+    # replace `@callback` with `@bdash_callback`
+    content = regex.sub("@callback", "@prefixed_callback", content)
+    return content
 
 
-def load_dash_app(path, app, precode="", encoding="utf8"):
+def load_dash_app(path, app, encoding="utf8"):
     with open(path, encoding=encoding) as f:
         content = f.read()
-    content = preprocess_dash_app(content, precode)
-    scope = {"app": app}
+    prefix = f"{Path(path).stem}_"
+    content = preprocess_dash_app(content)
+    scope = {"app": app, "prefixed_callback": partial(bdash_callback, prefix)}
     exec(content, scope)
 
     not_configured = ImproperlyConfigured(
@@ -67,5 +74,16 @@ def load_dash_app(path, app, precode="", encoding="utf8"):
 
     if layout is None:
         raise not_configured
-    
+    for component in layout._traverse():
+        if hasattr(component, "id"):
+            component.id = f"{prefix}{component.id}"
     return layout
+
+
+def bdash_callback(prefix, *args, **kwargs):
+    print("bdash_callback")
+    for component in args:
+        component.component_id = f"{prefix}{component.component_id}"
+    def wrapper(func):
+        return callback(*args, **kwargs)(func)
+    return wrapper
